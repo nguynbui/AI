@@ -7,7 +7,6 @@ Tin học,Thầy Nam,11A
 Thể dục,Cô Oanh,12A
 Sinh học,Cô Trinh,12B
 Hóa học,Cô Lan,12A
-Sinh học,Cô Trinh,12A
 Vật lý,Thầy Minh,12B
 Lịch sử,Cô Lan,11A
 Địa lý,Thầy Nam,10A
@@ -17,4 +16,3 @@ Mỹ thuật,Cô Trinh,12A
 Giáo dục công dân,Cô Lan,10B
 Thể dục,Cô Oanh,10A
 Toán,Thầy Hùng,11A
-Công nghệ,Thầy Minh,12B

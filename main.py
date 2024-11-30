@@ -1,10 +1,8 @@
 import random
-import pygal
-from remi import gui
-from remi import start, App
-from io import BytesIO
-import base64
-
+import tkinter as tk
+from tkinter import messagebox, filedialog
+import matplotlib.pyplot as plt
+import pandas as pd
 
 class GeneticScheduler:
     def __init__(self, input_file, population_size=20, generations=100, mutation_rate=0.1):
@@ -12,13 +10,13 @@ class GeneticScheduler:
         self.population_size = population_size
         self.generations = generations
         self.mutation_rate = mutation_rate
-        self.fitness_history = []  # Lưu trữ fitness tốt nhất qua các thế hệ
+        self.fitness_history = []
 
     def load_data(self):
         with open(self.input_file, "r", encoding="utf-8") as file:
             data = [line.strip().split(",") for line in file.readlines()]
         if len(data) < 2:
-            raise ValueError("Dữ liệu đầu vào không đủ để tạo thời khóa biểu.")
+            raise ValueError("Không đủ dữ liệu để tạo thời khóa biểu.")
         return data
 
     def create_individual(self, data):
@@ -88,6 +86,7 @@ class GeneticScheduler:
         if len(selected_population) < 2:
             selected_population += sorted_population[:2]
         return selected_population    
+
     def crossover(self, parent1, parent2):
         crossover_point = random.randint(1, len(parent1) - 1)
         child = parent1[:crossover_point] + parent2[crossover_point:]
@@ -132,126 +131,120 @@ class GeneticScheduler:
 
         return timetable
 
-class TimetableApp(App):
-    def __init__(self, *args):
-        super(TimetableApp, self).__init__(*args)
+class TimetableApp:
+    def __init__(self, master):
+        self.master = master
+        master.title("Quản Lý Thời Khóa Biểu")
+        master.geometry("800x700")
 
-    def main(self):
-        self.main_container = gui.VBox(width=800, height=600, style={'margin': 'auto', 'padding': '10px'})
-        label = gui.Label("Quản lý thời khóa biểu", style={'font-size': '24px', 'font-weight': 'bold'})
+        # Nút nhập dữ liệu
+        self.btn_input = tk.Button(master, text="Nhập Dữ Liệu", command=self.show_input_dialog)
+        self.btn_input.pack(pady=10)
 
-        self.btn_input = gui.Button("Nhập Dữ Liệu", width=200, height=30)
-        self.btn_input.onclick.connect(self.show_input)
+        # Nút tạo thời khóa biểu
+        self.btn_generate = tk.Button(master, text="Tạo Thời Khóa Biểu", command=self.generate_schedule)
+        self.btn_generate.pack(pady=10)
 
-        self.btn_generate = gui.Button("Tạo Thời Khóa Biểu", width=200, height=30)
-        self.btn_generate.onclick.connect(self.generate_schedule)
+        # Nút hiển thị biểu đồ fitness
+        self.btn_show_chart = tk.Button(master, text="Hiển Thị Biểu Đồ Đánh Giá", command=self.show_fitness_chart)
+        self.btn_show_chart.pack(pady=10)
 
-        self.btn_show_chart = gui.Button("Hiển Thị Biểu Đồ Đánh Giá", width=200, height=30)
-        self.btn_show_chart.onclick.connect(self.show_fitness_chart)
+        # Bảng thời khóa biểu
+        self.table_frame = tk.Frame(master)
+        self.table_frame.pack(pady=10)
 
-        self.table = gui.Table.new_from_list([["Ngày", "Tiết", "Lớp", "Môn học", "Giáo viên"]], width='100%')
-        self.table = gui.Table.new_from_list([["Ngày", "Tiết", "Lớp", "Môn học", "Giáo viên"]], width='100%', style={'border': '1px solid black', 'text-align': 'center'})
+        self.scheduler = None
 
-        self.chart_container = gui.Image(width='100%', height='auto')
+    def show_input_dialog(self):
+        input_window = tk.Toplevel(self.master)
+        input_window.title("Nhập Thông Tin")
+        input_window.geometry("300x250")
 
-        self.main_container.append([label, self.btn_input, self.btn_generate, self.btn_show_chart, self.table, self.chart_container])
-        return self.main_container
+        # Nhãn và ô nhập
+        tk.Label(input_window, text="Nhập Môn Học").pack()
+        subject_input = tk.Entry(input_window)
+        subject_input.pack()
 
-    def show_input(self, widget):
-        input_window = gui.VBox(width=400, height=300, style={'margin': 'auto', 'padding': '10px', 'border': '1px solid black'})
-        input_window.append(gui.Label("Nhập thông tin", style={'font-size': '18px', 'font-weight': 'bold', 'text-align': 'center'}))
+        tk.Label(input_window, text="Nhập Giáo Viên").pack()
+        teacher_input = tk.Entry(input_window)
+        teacher_input.pack()
 
-        self.subject_input = gui.TextInput(single_line=True, hint="Nhập môn học", style={'width': '100%'})
-        self.teacher_input = gui.TextInput(single_line=True, hint="Nhập giáo viên", style={'width': '100%'})
-        self.class_input = gui.TextInput(single_line=True, hint="Nhập lớp học", style={'width': '100%'})
+        tk.Label(input_window, text="Nhập Lớp Học").pack()
+        class_input = tk.Entry(input_window)
+        class_input.pack()
 
-        save_button = gui.Button("Lưu", style={'margin-top': '10px'})
-        save_button.onclick.connect(self.save_input_data)
+        def save_data():
+            subject = subject_input.get()
+            teacher = teacher_input.get()
+            _class = class_input.get()
 
-        input_window.append([self.subject_input, self.teacher_input, self.class_input, save_button])
-        self.main_container.append(input_window)
-
-    def save_input_data(self, widget):
-        subject = self.subject_input.get_value()
-        teacher = self.teacher_input.get_value()
-        _class = self.class_input.get_value()
-
-        if not all([subject, teacher, _class]):
-            self.main_container.append(gui.Label("Vui lòng nhập đầy đủ thông tin.", style={'color': 'red'}))
-            return
-
-        with open("input_data.txt", "a", encoding="utf-8") as file:
-            file.write(f"{subject},{teacher},{_class}\n")
-
-        self.main_container.append(gui.Label("Đã lưu dữ liệu thành công.", style={'color': 'green'}))
-
-    def generate_schedule(self, widget):
-        self.scheduler = GeneticScheduler("input_data.txt")
-        try:
-            timetable = self.scheduler.run()
-
-            if not timetable:
-                self.main_container.append(gui.Label("Thời khóa biểu không thể tạo được do dữ liệu không đủ.", style={'color': 'red'}))
+            if not all([subject, teacher, _class]):
+                messagebox.showerror("Lỗi", "Vui lòng nhập đầy đủ thông tin.")
                 return
 
-            # Làm trống danh sách hiển thị cũ nếu có
-            if hasattr(self, 'list_view'):
-                self.main_container.remove_child(self.list_view)
+            with open("input_data.txt", "a", encoding="utf-8") as file:
+                file.write(f"{subject},{teacher},{_class}\n")
+            
+            messagebox.showinfo("Thành Công", "Đã lưu dữ liệu thành công.")
+            input_window.destroy()
 
-            # Tạo danh sách mới để hiển thị thời khóa biểu
-            self.list_view = gui.VBox(width='100%', style={'margin-top': '20px', 'padding': '10px'})
+        save_button = tk.Button(input_window, text="Lưu", command=save_data)
+        save_button.pack(pady=10)
 
-            day_names = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+    def generate_schedule(self):
+        try:
+            self.scheduler = GeneticScheduler("input_data.txt")
+            timetable = self.scheduler.run()
 
-            for day_index, day_name in enumerate(day_names):
-                day_label = gui.Label(f"{day_name}:", style={'font-size': '18px', 'font-weight': 'bold', 'margin-top': '10px'})
-                self.list_view.append(day_label)
+            # Xóa bảng cũ nếu tồn tại
+            for widget in self.table_frame.winfo_children():
+                widget.destroy()
 
-                has_schedule = False  # Đánh dấu nếu ngày có lịch học
+            # Tạo bảng mới
+            headers = ["Tiết"] + ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+            
+            # Tạo tiêu đề
+            for j, header in enumerate(headers):
+                label = tk.Label(self.table_frame, text=header, relief=tk.RIDGE, width=15, font=('Arial', 10, 'bold'))
+                label.grid(row=0, column=j, sticky='nsew')
 
-                for entry in timetable:
-                    if entry[0] == day_name:
-                        has_schedule = True
-                        time, _class, subject, teacher = entry[1], entry[2], entry[3], entry[4]
-                        entry_label = gui.Label(
-                            f"  - {time}: {subject} - {_class} ({teacher})", 
-                            style={'font-size': '16px', 'margin-left': '20px'}
-                        )
-                        self.list_view.append(entry_label)
+            # Thêm nội dung thời khóa biểu
+            for i, row in enumerate(timetable):
+                # Cột tiết
+                label = tk.Label(self.table_frame, text=f"Tiết {i+1}", relief=tk.RIDGE, width=15)
+                label.grid(row=i+1, column=0, sticky='nsew')
 
-                if not has_schedule:
-                    no_schedule_label = gui.Label("  - Không có tiết học.", style={'font-size': '16px', 'margin-left': '20px', 'color': 'gray'})
-                    self.list_view.append(no_schedule_label)
+                # Các cột ngày
+                for j, cell in enumerate(row):
+                    label = tk.Label(self.table_frame, text=cell or "", relief=tk.RIDGE, width=15, wraplength=100)
+                    label.grid(row=i+1, column=j+1, sticky='nsew')
 
-            self.main_container.append(self.list_view)
-            self.main_container.append(gui.Label("Thời khóa biểu đã được tạo thành công.", style={'color': 'green'}))
-        except ValueError as e:
-            self.main_container.append(gui.Label(str(e), style={'color': 'red'}))
+            messagebox.showinfo("Thành Công", "Thời khóa biểu đã được tạo.")
+        except Exception as e:
+            messagebox.showerror("Lỗi", str(e))
 
-    def show_fitness_chart(self, widget):
-        if not hasattr(self, 'scheduler') or not hasattr(self.scheduler, 'fitness_history') or not self.scheduler.fitness_history:
-            self.main_container.append(gui.Label("Hãy tạo thời khóa biểu trước khi hiển thị biểu đồ.", style={'color': 'red'}))
+    def show_fitness_chart(self):
+        if not self.scheduler or not self.scheduler.fitness_history:
+            messagebox.showwarning("Cảnh Báo", "Hãy tạo thời khóa biểu trước khi hiển thị biểu đồ.")
             return
 
         # Tách dữ liệu fitness từ lịch sử
         generations = range(1, len(self.scheduler.fitness_history) + 1)
         best_fitness = [entry["best"] for entry in self.scheduler.fitness_history]
 
-        # Tạo biểu đồ bằng Pygal
-        chart = pygal.Line()
-        chart.title = 'Biểu đồ Đánh Giá Fitness Qua Các Thế Hệ'
-        chart.x_labels = [str(gen) for gen in generations]
+        # Tạo biểu đồ bằng matplotlib
+        plt.figure(figsize=(10, 5))
+        plt.plot(generations, best_fitness, marker='o')
+        plt.title('Biểu Đồ Đánh Giá Fitness Qua Các Thế Hệ')
+        plt.xlabel('Thế Hệ')
+        plt.ylabel('Fitness')
+        plt.grid(True)
+        plt.show()
 
-        if best_fitness:
-            chart.add('Best Fitness', best_fitness)
-
-        # Lưu biểu đồ vào buffer
-        chart_data = chart.render()
-        chart_data_base64 = base64.b64encode(chart_data).decode('utf-8')
-
-        # Hiển thị biểu đồ trên giao diện
-        self.chart_container.attributes['src'] = f"data:image/svg+xml;base64,{chart_data_base64}"
-        self.main_container.append(self.chart_container)
+def main():
+    root = tk.Tk()
+    app = TimetableApp(root)
+    root.mainloop()
 
 if __name__ == "__main__":
-    start(TimetableApp, address="0.0.0.0", port=8080)
+    main()
